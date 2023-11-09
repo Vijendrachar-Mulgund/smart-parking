@@ -9,7 +9,7 @@ VIDEO_SOURCE = 1
 # start the recording
 cap = cv2.VideoCapture(VIDEO_SOURCE)
 
-# Allow the camera to start (To avoid the blank first frame)
+# Allow the camera to start (To avoid the blank first frame) # Time in seconds.
 time.sleep(3)
 
 ret, image = cap.read()
