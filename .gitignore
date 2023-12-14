@@ -1,3 +1,9 @@
-/venvsp
+/lib
 /data
+/images
+/include
+/bin
 /.idea
+
+pyvenv.cfg
+.DS_Store

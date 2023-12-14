@@ -2,7 +2,12 @@
 import cv2
 import csv
 import numpy
-from PIL import Image
+import socket
+import os
+# from PIL import Image
+
+SERVER_IP_ADDRESS = '127.0.0.1'
+SERVER_PORT = 5050
 
 
 # Declaring a static variable
@@ -12,7 +17,7 @@ class Spots:
 
 # Function to determine if a spot is free/occupied
 # Params include: image source, individual spot coordinates
-def drawRectangle(img, a, b, c, d):
+def drawRectangle(img, a, b, c, d, lowThreshold, highThreshold, minValue, maxValue):
     # cutting the image based on the coordinates
     sub_img = img[b:b + d, a:a + c]
 
@@ -53,16 +58,62 @@ cv2.createTrackbar('Min pixels', 'parameters', 100, 1500, callback)
 cv2.createTrackbar('Max pixels', 'parameters', 500, 1500, callback)
 
 
-# Start the feed
-while True:
+def imageProcessor(serverAddress, savePath):
+    serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    serverSocket.bind(serverAddress)
+    serverSocket.listen(1)
+
+    print(f"[SERVER] Waiting for a connection on {serverAddress}...")
+
+    connection, clientAddress = serverSocket.accept()
+    print(f"[SERVER] Connected to {clientAddress}")
+
+    try:
+        while True:
+            # Receive image from the client
+            imageSize = connection.recv(8)
+
+            # If there is no image size, then break
+            if not imageSize:
+                break
+
+            imageSize = int.from_bytes(imageSize, byteorder='big')
+
+            imageData = connection.recv(imageSize)
+            imageNameSize = connection.recv(4)
+            image_name_size = int.from_bytes(imageNameSize, byteorder='big')
+
+            imageName = connection.recv(image_name_size).decode('utf-8')
+            imagePath = os.path.join(savePath, imageName)
+
+            with open(imagePath, 'wb') as imageFile:
+                imageFile.write(imageData)
+
+            print(f"[SERVER] Received: {imageName}")
+
+            # Process the image here # Find the parking spots and write the processed image into the file
+            findParkingSpots(imageFile)
+
+            # Send the received image back to the same client
+            with open(imagePath, 'rb') as imgFile:
+                image_data = imgFile.read()
+
+            connection.sendall(len(image_data).to_bytes(8, byteorder='big'))
+            connection.sendall(image_data)
+
+            print(f"[SERVER] Sent back: {imageName}")
+
+    finally:
+        connection.close()
+        serverSocket.close()
+
+
+def findParkingSpots(imageFile):
     # set the number of spots to 0
     Spots.loc = 0
 
-    # Read the image from the folder
-    imgRead = Image.open('data/frame0.jpg')
-
     # Convert the Image to a Numpy array
-    frame = numpy.array(imgRead)
+    frame = numpy.array(imageFile)
 
     # Define the range of pixels and the thresholds for Canny function
     minValue = cv2.getTrackbarPos('Min pixels', 'parameters')
@@ -72,17 +123,26 @@ while True:
 
     # Apply the function for every list of coordinates
     for i in range(len(rois)):
-        drawRectangle(frame, rois[i][0], rois[i][1], rois[i][2], rois[i][3])
+        drawRectangle(frame, rois[i][0], rois[i][1], rois[i][2], rois[i][3], lowThreshold, highThreshold, minValue,
+                      maxValue)
 
     # Adding the number of available spots on the shown image
     font = cv2.FONT_HERSHEY_SIMPLEX
     cv2.putText(frame, 'Available spots: ' + str(Spots.loc), (10, 30), font, 1, (0, 255, 0), 3)
-    cv2.imshow('Parking Space', frame)
+    # cv2.imshow('Parking Space', frame)
 
     # Displaying the image with Canny function applied for reference
-    canny = cv2.Canny(frame, lowThreshold, highThreshold)
-    cv2.imshow('Canny Image', canny)
+    # canny = cv2.Canny(frame, lowThreshold, highThreshold)
+    # cv2.imshow('Canny Image', canny)
 
-    # Listen for 'Q' key to stop the stream
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+
+# The start of the program #
+if __name__ == "__main__":
+    server = (SERVER_IP_ADDRESS, SERVER_PORT)  # Change to your desired address and port
+    filePath = 'images'  # Change to your desired directory
+    os.makedirs(filePath, exist_ok=True)
+
+    try:
+        imageProcessor(server, filePath)
+    except KeyboardInterrupt:
+        print('Server')
