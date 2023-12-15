@@ -4,14 +4,19 @@ import csv
 import time
 import os
 import socket
+import pickle
+import struct
 
 # Constants
 VIDEO_SOURCE = 1
-SERVER_IP_ADDRESS = '127.0.0.1'
+SERVER_IP = '127.0.0.1'
 SERVER_PORT = 5050
+SERVER_ADDR = (SERVER_IP, SERVER_PORT)
+CODEC = 'utf-8'
+CLIENT_FILE_PATH = 'client_data'
 
 
-def captureInitialImageAndRoi():
+def captureImageAndRoi():
     # Start the Camera
     cap = cv2.VideoCapture(VIDEO_SOURCE)
 
@@ -31,7 +36,7 @@ def captureInitialImageAndRoi():
             print(rlist)
 
             # Write the list into a csv file
-            with open('data/rois.csv', 'w', newline='') as outf:
+            with open(f"{CLIENT_FILE_PATH}/rois.csv", 'w', newline='') as outf:
                 csvw = csv.writer(outf)
                 csvw.writerows(rlist)
         else:
@@ -42,10 +47,10 @@ def captureInitialImageAndRoi():
     cv2.destroyAllWindows()
 
 
-def sendCSVFileToServer(clientSocket):
+def sendRoiFileToServer(clientSocket):
     csvFileName = os.path.basename('data/rois.csv')
 
-    with open('data/rois.csv', 'rb') as csvFile:
+    with open(f"{CLIENT_FILE_PATH}/rois.csv", 'rb') as csvFile:
         csvFileData = csvFile.read()
 
     clientSocket.sendall(len(csvFileData).to_bytes(8, byteorder='big'))
@@ -56,59 +61,74 @@ def sendCSVFileToServer(clientSocket):
     print(f"[CLIENT] Sent CSV file: {csvFileName}")
 
 
-def imageCaptureSendToServer(serverAddress):
-    clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    clientSocket.connect(serverAddress)
-
-    # Send the CSV file to the server
-    sendCSVFileToServer(clientSocket)
-
-    # Start capturing the image for processing
-    camera = cv2.VideoCapture(VIDEO_SOURCE)  # Use 0 for the default camera
-
+def videoStreamToAndFromServer(clientSocket):
+    # Open the camera
+    video_capture = cv2.VideoCapture(VIDEO_SOURCE)
     try:
-        time.sleep(2)  # Allow the camera to warm up
-
         while True:
-            # Capture an image
-            ret, frame = camera.read()
-            if not ret:
-                print("[CLIENT] Failed to capture image.")
+            # Capture a frame from the video source
+            _, frame = video_capture.read()
+
+            # Serialize each the frame
+            frameData = pickle.dumps(frame)
+
+            # Send the frame to the server
+            clientSocket.sendall(struct.pack("Q", len(frameData)) + frameData)
+
+            # Receive the processed frame from the server
+            data = b""
+            payloadSize = struct.calcsize("Q")
+
+            while len(data) < payloadSize:
+                packet = clientSocket.recv(4 * 1024)
+                if not packet:
+                    break
+                data += packet
+
+            packedMsgSize = data[:payloadSize]
+            data = data[payloadSize:]
+            msg_size = struct.unpack("Q", packedMsgSize)[0]
+
+            while len(data) < msg_size:
+                data += clientSocket.recv(4 * 1024)
+
+            processed_frame_data = data[:msg_size]
+            data = data[msg_size:]
+
+            processed_frame = pickle.loads(processed_frame_data)
+
+            # Display the processed frame (you can modify this part)
+            cv2.imshow('Processed Video', processed_frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-            # Encode the image as JPEG
-            _, imageData = cv2.imencode('.jpg', frame)
-            image_data = imageData.tobytes()
-
-            # Send the image to the server
-            imageSize = len(image_data).to_bytes(8, byteorder='big')
-            imageName = f"parking_image.jpg".encode('utf-8')
-            imageNameSize = len(imageName).to_bytes(4, byteorder='big')
-
-            clientSocket.sendall(imageSize)
-            clientSocket.sendall(image_data)
-            clientSocket.sendall(imageNameSize)
-            clientSocket.sendall(imageName)
-
-            print(f"[CLIENT] Sent: {imageName.decode('utf-8')}")
-
-            # Wait for 5 seconds before capturing the next image
-            time.sleep(5)
-
-    except KeyboardInterrupt:
-        print("[CLIENT] Client terminated by user.")
-
     finally:
-        camera.release()
         clientSocket.close()
+        video_capture.release()
+        cv2.destroyAllWindows()
 
 
+def initClient():
+    # Initialize the client socket to connect to the server
+    clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    clientSocket.connect(SERVER_ADDR)
+
+    # Capture the initial image and get the ROI co-ordinates
+    captureImageAndRoi()
+
+    # Send the Region of interest file to the server
+    sendRoiFileToServer(clientSocket)
+
+    # Start the video stream to the server and receive the processed video parallely and display
+    videoStreamToAndFromServer(clientSocket)
+
+
+# Start of the Client program
 if __name__ == "__main__":
-    # First capture the image and select Region of interest
-    captureInitialImageAndRoi()
+    os.makedirs(CLIENT_FILE_PATH, exist_ok=True)
 
-    # Establish a connection with the server
-    server_address = (SERVER_IP_ADDRESS, SERVER_PORT)  # Change to the server address and port
-
-    # Capture images every 5 seconds to send it to the server
-    imageCaptureSendToServer(server_address)
+    try:
+        initClient()
+    except KeyboardInterrupt:
+        print('Client Shutdown 🛑')

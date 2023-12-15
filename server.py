@@ -77,44 +77,44 @@ def receiveRoiFile(connection):
 
 
 # def imageProcessor(serverAddress):
-    # try:
-    #         while True:
-    #             # Receive image from the client
-    #             imageSize = connection.recv(8)
-    #
-    #             # If there is no image size, then break
-    #             if not imageSize:
-    #                 break
-    #
-    #             imageSize = int.from_bytes(imageSize, byteorder='big')
-    #
-    #             imageData = connection.recv(imageSize)
-    #             imageNameSize = connection.recv(4)
-    #             image_name_size = int.from_bytes(imageNameSize, byteorder='big')
-    #
-    #             imageName = connection.recv(image_name_size).decode('utf-8')
-    #             imagePath = os.path.join('server_files', imageName)
-    #
-    #             with open(imagePath, 'wb') as imageFile:
-    #                 imageFile.write(imageData)
-    #
-    #             print(f"[SERVER] Received: {imageName}")
-    #
-    #             # Process the image here # Find the parking spots and write the processed image into the file
-    #             findParkingSpots(imageFile)
-    #
-    #             # Send the received image back to the same client
-    #             with open(imagePath, 'rb') as imgFile:
-    #                 image_data = imgFile.read()
-    #
-    #             connection.sendall(len(image_data).to_bytes(8, byteorder='big'))
-    #             connection.sendall(image_data)
-    #
-    #             print(f"[SERVER] Sent back: {imageName}")
-    #
-    #     finally:
-    #         connection.close()
-    #         serverSocket.close()
+# try:
+#         while True:
+#             # Receive image from the client
+#             imageSize = connection.recv(8)
+#
+#             # If there is no image size, then break
+#             if not imageSize:
+#                 break
+#
+#             imageSize = int.from_bytes(imageSize, byteorder='big')
+#
+#             imageData = connection.recv(imageSize)
+#             imageNameSize = connection.recv(4)
+#             image_name_size = int.from_bytes(imageNameSize, byteorder='big')
+#
+#             imageName = connection.recv(image_name_size).decode('utf-8')
+#             imagePath = os.path.join('server_files', imageName)
+#
+#             with open(imagePath, 'wb') as imageFile:
+#                 imageFile.write(imageData)
+#
+#             print(f"[SERVER] Received: {imageName}")
+#
+#             # Process the image here # Find the parking spots and write the processed image into the file
+#             findParkingSpots(imageFile)
+#
+#             # Send the received image back to the same client
+#             with open(imagePath, 'rb') as imgFile:
+#                 image_data = imgFile.read()
+#
+#             connection.sendall(len(image_data).to_bytes(8, byteorder='big'))
+#             connection.sendall(image_data)
+#
+#             print(f"[SERVER] Sent back: {imageName}")
+#
+#     finally:
+#         connection.close()
+#         serverSocket.close()
 
 
 # def findParkingSpots(imageFile):
@@ -156,19 +156,21 @@ def initServer():
     connection, clientAddress = serverSocket.accept()
     print(f"[SERVER] Connected to {clientAddress}")
 
-    # Receive the CSF with the region of interest co-ordinates and store the file in the server
-    receiveRoiFile(connection)
+    try:
+        # Receive the CSF with the region of interest co-ordinates and store the file in the server
+        receiveRoiFile(connection)
 
-    # At the end, close the socket connection
-    connection.close()
-    serverSocket.close()
+    finally:
+        # At the end, close the socket connection
+        connection.close()
+        serverSocket.close()
 
 
-# The start of the program
+# The start of the Server program
 if __name__ == "__main__":
     os.makedirs(SERVER_FILE_PATH, exist_ok=True)
 
     try:
         initServer()
     except KeyboardInterrupt:
-        print('Server')
+        print('Server shutdown 🛑')
