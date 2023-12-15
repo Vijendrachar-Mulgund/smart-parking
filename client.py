@@ -56,7 +56,7 @@ def sendRoiFileToServer(clientSocket):
     clientSocket.sendall(len(csvFileData).to_bytes(8, byteorder='big'))
     clientSocket.sendall(csvFileData)
     clientSocket.sendall(len(csvFileName).to_bytes(4, byteorder='big'))
-    clientSocket.sendall(csvFileName.encode('utf-8'))
+    clientSocket.sendall(csvFileName.encode(CODEC))
 
     print(f"[CLIENT] Sent CSV file: {csvFileName}")
 
@@ -114,14 +114,18 @@ def initClient():
     clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     clientSocket.connect(SERVER_ADDR)
 
-    # Capture the initial image and get the ROI co-ordinates
-    captureImageAndRoi()
+    try:
+        # Capture the initial image and get the ROI co-ordinates
+        captureImageAndRoi()
 
-    # Send the Region of interest file to the server
-    sendRoiFileToServer(clientSocket)
+        # Send the Region of interest file to the server
+        sendRoiFileToServer(clientSocket)
 
-    # Start the video stream to the server and receive the processed video parallely and display
-    videoStreamToAndFromServer(clientSocket)
+        # Start the video stream to the server and receive the processed video parallely and display
+        videoStreamToAndFromServer(clientSocket)
+
+    finally:
+        clientSocket.close()
 
 
 # Start of the Client program
