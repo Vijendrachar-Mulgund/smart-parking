@@ -134,5 +134,5 @@ if __name__ == "__main__":
 
     try:
         initClient()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ConnectionResetError):
         print('Client Shutdown 🛑')

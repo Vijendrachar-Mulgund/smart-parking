@@ -181,5 +181,5 @@ if __name__ == "__main__":
 
     try:
         initServer()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ConnectionResetError):
         print('Server shutdown 🛑')
