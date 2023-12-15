@@ -1,6 +1,6 @@
 # Importing everything we need
 import cv2
-# import csv
+import csv
 import numpy
 import socket
 import os
@@ -57,14 +57,21 @@ def receiveRoiFile(connection):
     csvFileName = connection.recv(csvFileNameSize).decode(CODEC)
     csvFilePath = os.path.join(SERVER_FILE_PATH, csvFileName)
 
+    print("[SERVER] The CSV file ", csvFileData)
+
     with open(csvFilePath, 'wb') as csv_file:
         csv_file.write(csvFileData)
 
+    # getting the spots coordinates into a list
+    with open(f"{SERVER_FILE_PATH}/rois.csv", 'r', newline='') as inf:
+        csvRead = csv.reader(inf)
+        rois = list(csvRead)
+    # converting the values to integer
+    rois = [[int(float(j)) for j in i] for i in rois]
+
     print(f"[SERVER] Received CSV file: {csvFileName}")
 
-    listOfRois = list(csvFileData)
-
-    return listOfRois
+    return rois
 
 
 # Process each image frame
@@ -105,15 +112,6 @@ def processFrame(iframe, rois):
     # if cv2.waitKey(1) & 0xFF == ord('q'):
     #     break
     return frame
-
-
-def setTrackBarParameters():
-    # Creating the parameters window with trackbars
-    cv2.namedWindow('parameters')
-    cv2.createTrackbar('Threshold1', 'parameters', 186, 700, callback)
-    cv2.createTrackbar('Threshold2', 'parameters', 122, 700, callback)
-    cv2.createTrackbar('Min pixels', 'parameters', 100, 1500, callback)
-    cv2.createTrackbar('Max pixels', 'parameters', 500, 1500, callback)
 
 
 def videoStreamFormAndToClient(connection, rois):
@@ -166,10 +164,7 @@ def initServer():
 
     try:
         # Receive the CSF with the region of interest co-ordinates and store the file in the server
-        roisPoints = receiveRoiFile(connection)
-
-        # Converting the co-ordinate values to integer
-        rois = [[int(float(j)) for j in i] for i in roisPoints]
+        rois = receiveRoiFile(connection)
 
         # Receive the feed from the client to process, send the processed feed back to the client
         videoStreamFormAndToClient(connection, rois)
