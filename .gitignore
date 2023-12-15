@@ -1,9 +1,9 @@
 /lib
 /data
-/images
 /include
 /bin
 /.idea
+/server_data
 
 pyvenv.cfg
 .DS_Store
