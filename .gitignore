@@ -2,6 +2,7 @@
 /include
 /bin
 /.idea
+/.vscode
 /server_data
 /client_data
 
