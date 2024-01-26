@@ -55,7 +55,7 @@ Once the virtual environment is active, clone the project and install the depend
 pip install -r requirements.txt
 ```
 
-This command will install all the dependencies mentioned in the `retirements.txt` file
+This command will install all the dependencies mentioned in the `requirements.txt` file
 
 This procedure applies to both the client and the server.
 
